@@ -1,0 +1,1 @@
+ALTER TABLE `businessResults` MODIFY COLUMN `source` enum('google_maps','justdial','indiamart','linkedin','yellowpages','tradeindia','other') DEFAULT 'google_maps';

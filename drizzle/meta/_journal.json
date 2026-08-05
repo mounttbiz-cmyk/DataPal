@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1784715795319,
+      "tag": "0000_broad_sage",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1784716825337,
+      "tag": "0001_chief_the_fallen",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1784718821266,
+      "tag": "0002_perfect_revanche",
+      "breakpoints": true
+    }
+  ]
+}

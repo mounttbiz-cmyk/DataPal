@@ -1,0 +1,22 @@
+# Project TODO
+
+- [x] Database schema for search history and scraped results
+- [x] Backend scraping from JustDial (business name, phone, address, category)
+- [x] Backend scraping from IndiaMART (business name, phone, address, category)
+- [x] Backend scraping from LinkedIn (company name, website, email)
+- [x] Backend scraping from public directories (Yellow Pages, TradeIndia)
+- [x] Email extraction from business websites via regex
+- [x] Search form with business type and location selector (default Mumbai, India-wide)
+- [x] Results table with Name, Phone, Email, Address, Category, Source columns
+- [x] Excel export with two sheets: Sheet 1 = phone numbers, Sheet 2 = emails
+- [x] Search history (save and revisit previous queries)
+- [x] Pagination for large result sets
+- [x] Progress indicator during scraping
+- [x] Elegant, polished, premium UI design
+- [x] Backend tRPC routes for search, history, and export
+- [x] Frontend pages and components
+- [x] Write vitest tests for backend logic (scraper/excel export unit tests)
+- [x] Fix scraper returning fake/noise data (LinkedIn footer links, privacy policies)
+- [x] Replace LinkedIn with reliable sources (Google, Bing, Google Maps, etc.)
+- [x] Add name validation to filter out non-business entries
+- [x] Test with actual search to verify real business data is returned
