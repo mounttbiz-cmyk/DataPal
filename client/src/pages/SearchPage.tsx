@@ -204,7 +204,7 @@ export default function SearchPage() {
     }
 
     if (!requirementText.trim()) {
-      toast.error("Please specify a lead requirement");
+      toast.error("Please specify a data requirement");
       return;
     }
 
@@ -218,7 +218,7 @@ export default function SearchPage() {
     stopProgressInterval();
     setIsSearching(true);
     setProgress(15);
-    setCurrentSearchLabel(`Searching for leads${finalRequirement !== 'all' ? ' with specific requirements' : ''} across ${location}...`);
+    setCurrentSearchLabel(`Searching for data${finalRequirement !== 'all' ? ' with specific requirements' : ''} across ${location}...`);
 
     try {
       const interval = setInterval(() => {
@@ -286,10 +286,10 @@ export default function SearchPage() {
         >
           <h1 className="text-5xl lg:text-6xl font-extrabold mb-4 tracking-tighter">
             <span className="text-slate-900">Generate </span>
-            <span className="text-indigo-600">Leads</span>
+            <span className="text-indigo-600">Data</span>
           </h1>
           <p className="text-lg lg:text-xl text-slate-800 max-w-2xl mx-auto font-medium">
-            Configure your search parameters to extract high-quality business leads across India.
+            Configure your search parameters to extract high-quality business data across India.
           </p>
         </motion.div>
 
@@ -407,7 +407,7 @@ export default function SearchPage() {
                   {/* Requirement Selection */}
                   <div className="space-y-3">
                     <Label className="text-sm font-bold text-slate-950">
-                      Lead Requirement (Target Profile)
+                      Data Requirement (Target Profile)
                     </Label>
                     <div className="relative" ref={reqDropdownRef}>
                       <div
@@ -631,7 +631,7 @@ export default function SearchPage() {
                     ) : (
                       <>
                         <FileSpreadsheet className="w-6 h-6 mr-3" />
-                        Generate Lead Report
+                        Generate Data Report
                       </>
                     )}
                   </Button>

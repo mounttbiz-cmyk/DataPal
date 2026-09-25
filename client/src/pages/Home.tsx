@@ -11,7 +11,7 @@ import {
 const features = [
   {
     title: "Fast & Accurate",
-    description: "Extract data from hundreds of pages in seconds. Our engine runs parallel tasks to ensure you get leads as quickly as possible.",
+    description: "Extract data from hundreds of pages in seconds. Our engine runs parallel tasks to ensure you get data as quickly as possible.",
     icon: Zap,
   },
   {
@@ -26,7 +26,7 @@ const features = [
   },
   {
     title: "Export Ready",
-    description: "Download your leads in clean, formatted CSV or Excel files immediately ready for import into your CRM.",
+    description: "Download your data in clean, formatted CSV or Excel files immediately ready for import into your CRM.",
     icon: Download,
   }
 ];

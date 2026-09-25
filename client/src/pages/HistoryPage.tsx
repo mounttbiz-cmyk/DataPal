@@ -115,7 +115,7 @@ export default function HistoryPage() {
                 <span className="text-sm font-bold text-gray-800 tracking-wide">Command Center</span>
               </div>
               <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 mb-3 tracking-tighter">Search <span className="premium-gradient-text">History</span></h1>
-              <p className="text-lg text-gray-500 font-medium">Revisit and export your generated lead campaigns.</p>
+              <p className="text-lg text-gray-500 font-medium">Revisit and export your generated data campaigns.</p>
             </div>
             <Button
               onClick={handleExportAll}
