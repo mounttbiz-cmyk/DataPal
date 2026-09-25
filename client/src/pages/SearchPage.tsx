@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -14,45 +14,23 @@ import {
   Building2,
   Loader2,
   ArrowRight,
-  Sparkles,
   ChevronDown,
   CheckSquare,
   Square,
   X,
   CheckCheck,
   Upload,
-  Image as ImageIcon,
   Bot,
   Target,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Globe,
+  Navigation,
+  Compass,
+  Layers,
+  Filter
 } from "lucide-react";
-
-const INDIAN_CITIES = [
-  "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Kolkata", "Pune",
-  "Ahmedabad", "Jaipur", "Surat", "Lucknow", "Kanpur", "Nagpur", "Indore",
-  "Thane", "Bhopal", "Visakhapatnam", "Patna", "Vadodara", "Ghaziabad",
-  "Ludhiana", "Agra", "Nashik", "Faridabad", "Meerut", "Rajkot", "Varanasi",
-  "Srinagar", "Aurangabad", "Dhanbad", "Amritsar", "Navi Mumbai", "Allahabad",
-  "Ranchi", "Howrah", "Coimbatore", "Jabalpur", "Gwalior", "Vijayawada",
-  "Jodhpur", "Madurai", "Raipur", "Kota", "Guwahati", "Chandigarh", "Solapur",
-  "Hubli-Dharwad", "Bareilly", "Moradabad", "Mysore", "Tiruchirappalli",
-  "Tiruppur", "Gurgaon", "Aligarh", "Jalandhar", "Bhubaneswar", "Salem",
-  "Warangal", "Thiruvananthapuram", "Noida", "Jamshedpur", "Kochi", "Dehradun",
-];
-
-const BUSINESS_TYPES = [
-  "Schools", "Colleges", "Universities", "Coaching Centers", "Tuition Centers",
-  "Real Estate Developers", "Builders", "Architects", "Interior Designers", "Real Estate Agents",
-  "Hospitals", "Clinics", "Dental Clinics", "Pharmacies",
-  "Restaurants", "Cafes", "Hotels", "Resorts",
-  "Gyms & Fitness Centers", "Salons", "Spas",
-  "IT & Software Companies", "Startups",
-  "Manufacturing", "Logistics", "Transport",
-  "Retail Stores", "E-commerce Stores",
-  "Banks", "Insurance Companies", "Financial Advisors",
-  "Lawyers", "Chartered Accountants", "Consulting Firms", "Marketing Agencies",
-  "Wedding Planners", "Event Management",
-];
+import { GLOBAL_COUNTRIES, type CountryData } from "@/config/globalLocations";
+import { CATEGORY_GROUPS, ALL_SUBCATEGORIES } from "@/config/businessCategories";
 
 const REQUIREMENTS = [
   { id: "all", label: "All Businesses", desc: "No specific requirement" },
@@ -79,24 +57,42 @@ const itemVariants = {
 export default function SearchPage() {
   const [, navigate] = useLocation();
   const { isAuthenticated } = useAuth();
+
+  // --- Category / Business Types State ---
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedCategoryGroupId, setSelectedCategoryGroupId] = useState<string>("all");
+  const [typeSearch, setTypeSearch] = useState("");
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // --- Requirements State ---
   const [requirementText, setRequirementText] = useState("");
   const [reqDropdownOpen, setReqDropdownOpen] = useState(false);
   const reqDropdownRef = useRef<HTMLDivElement>(null);
 
-  const [typeSearch, setTypeSearch] = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [location, setLocation] = useState("All India");
+  // --- Hierarchical Global Location State (Country -> State -> City -> Area / PIN) ---
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string>("US");
+  const [customCountryName, setCustomCountryName] = useState<string>("");
+
+  const [selectedStateName, setSelectedStateName] = useState<string>("California");
+  const [customStateName, setCustomStateName] = useState<string>("");
+
+  const [selectedCityName, setSelectedCityName] = useState<string>("Los Angeles");
+  const [customCityName, setCustomCityName] = useState<string>("");
+
+  const [areaPincode, setAreaPincode] = useState<string>("");
+
+  // --- Search Execution & Progress State ---
   const [isSearching, setIsSearching] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentSearchLabel, setCurrentSearchLabel] = useState("");
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // --- AI Service Analyzer State ---
   const [analyzerUrl, setAnalyzerUrl] = useState("");
-  const [analyzerImage, setAnalyzerImage] = useState<{ base64: string, mime: string, name: string } | null>(null);
+  const [analyzerImage, setAnalyzerImage] = useState<{ base64: string; mime: string; name: string } | null>(null);
   const [analyzeResult, setAnalyzeResult] = useState<string | null>(null);
+
   const analyzeMutation = trpc.scraper.analyzeProviderService.useMutation({
     onSuccess: (data) => {
       setRequirementText(data.requirement);
@@ -127,7 +123,6 @@ export default function SearchPage() {
     };
     reader.readAsDataURL(file);
   };
-  // ----------------------------------
 
   const stopProgressInterval = useCallback(() => {
     if (progressIntervalRef.current) {
@@ -140,11 +135,11 @@ export default function SearchPage() {
     return () => stopProgressInterval();
   }, [stopProgressInterval]);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setCategoryDropdownOpen(false);
       }
       if (reqDropdownRef.current && !reqDropdownRef.current.contains(event.target as Node)) {
         setReqDropdownOpen(false);
@@ -154,52 +149,75 @@ export default function SearchPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredTypes = BUSINESS_TYPES.filter((t) =>
-    t.toLowerCase().includes(typeSearch.toLowerCase())
-  );
+  // Current active country data
+  const activeCountry = useMemo(() => {
+    return GLOBAL_COUNTRIES.find(c => c.code === selectedCountryCode);
+  }, [selectedCountryCode]);
 
-  const allSelected = selectedTypes.length === BUSINESS_TYPES.length;
+  // Current active state list
+  const availableStates = useMemo(() => {
+    return activeCountry ? activeCountry.states : [];
+  }, [activeCountry]);
+
+  // Current active city list
+  const availableCities = useMemo(() => {
+    if (!activeCountry) return [];
+    if (!selectedStateName || selectedStateName === "All States") {
+      return activeCountry.states.flatMap(s => s.cities).slice(0, 15);
+    }
+    const stateObj = activeCountry.states.find(s => s.name === selectedStateName);
+    return stateObj ? stateObj.cities : [];
+  }, [activeCountry, selectedStateName]);
+
+  // Compute final combined location string
+  const resolvedCountry = selectedCountryCode === "OTHER" ? (customCountryName.trim() || "Global") : (activeCountry?.name || "Global");
+  const resolvedState = selectedStateName === "CUSTOM" ? customStateName.trim() : (selectedStateName === "All States" ? "" : selectedStateName);
+  const resolvedCity = selectedCityName === "CUSTOM" ? customCityName.trim() : (selectedCityName === "All Cities" ? "" : selectedCityName);
+  const resolvedArea = areaPincode.trim();
+
+  const compositeLocation = useMemo(() => {
+    const parts = [
+      resolvedArea,
+      resolvedCity,
+      resolvedState,
+      resolvedCountry
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(", ") : "Global";
+  }, [resolvedArea, resolvedCity, resolvedState, resolvedCountry]);
+
+  // Filtered subcategories by active group & search
+  const visibleSubcategories = useMemo(() => {
+    let pool = ALL_SUBCATEGORIES;
+    if (selectedCategoryGroupId !== "all") {
+      const group = CATEGORY_GROUPS.find(g => g.id === selectedCategoryGroupId);
+      if (group) pool = group.subcategories;
+    }
+    if (!typeSearch.trim()) return pool;
+    return pool.filter(t => t.toLowerCase().includes(typeSearch.toLowerCase()));
+  }, [selectedCategoryGroupId, typeSearch]);
 
   const toggleType = (type: string) => {
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    setSelectedTypes(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
     );
   };
 
-  const toggleSelectAll = () => {
+  const toggleSelectGroup = (subcategories: string[]) => {
+    const allSelected = subcategories.every(s => selectedTypes.includes(s));
     if (allSelected) {
-      setSelectedTypes([]);
+      setSelectedTypes(prev => prev.filter(s => !subcategories.includes(s)));
     } else {
-      setSelectedTypes([...BUSINESS_TYPES]);
+      setSelectedTypes(prev => Array.from(new Set([...prev, ...subcategories])));
     }
   };
 
-  const removeType = (type: string) => {
-    setSelectedTypes((prev) => prev.filter((t) => t !== type));
-  };
-
+  // Mutations
   const bulkSearchMutation = trpc.scraper.bulkSearch.useMutation();
   const utils = trpc.useUtils();
 
-  function downloadBase64(base64: string, filename: string, mimeType: string) {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   const handleSearch = async () => {
-    if (!location.trim()) {
-      toast.error("Please enter a location");
+    if (!compositeLocation.trim()) {
+      toast.error("Please specify a location");
       return;
     }
 
@@ -213,12 +231,12 @@ export default function SearchPage() {
     );
     const finalRequirement = matchedReq ? matchedReq.id : requirementText.trim();
 
-    const typesToSearch = selectedTypes.length === 0 ? [...BUSINESS_TYPES] : [...selectedTypes];
+    const typesToSearch = selectedTypes.length === 0 ? visibleSubcategories.slice(0, 5) : [...selectedTypes];
 
     stopProgressInterval();
     setIsSearching(true);
     setProgress(15);
-    setCurrentSearchLabel(`Searching for data${finalRequirement !== 'all' ? ' with specific requirements' : ''} across ${location}...`);
+    setCurrentSearchLabel(`Extracting data across ${compositeLocation}...`);
 
     try {
       const interval = setInterval(() => {
@@ -227,33 +245,49 @@ export default function SearchPage() {
 
       const bulkResult = await bulkSearchMutation.mutateAsync({
         businessTypes: typesToSearch,
-        location: location.trim(),
-        requirement: finalRequirement === "all" ? undefined : finalRequirement,
+        location: compositeLocation,
+        requirement: finalRequirement,
       });
 
       clearInterval(interval);
-      setProgress(95);
-      setCurrentSearchLabel("Generating your all-in-one Excel file...");
-
-      const d = await utils.scraper.exportAllExcel.fetch({ searchIds: bulkResult.searchIds });
-
       setProgress(100);
-      setIsSearching(false);
-      setCurrentSearchLabel("");
 
-      if (d && d.base64) {
-        downloadBase64(d.base64, d.filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        toast.success(`🎉 Completed! Automatic download triggered for "${d.filename}"`);
-      } else {
-        toast.success(`🎉 Completed search! Check your History page to download.`);
+      toast.success(`Data extraction complete for ${typesToSearch.length} categories!`);
+
+      // Auto-download compiled excel
+      try {
+        const d = await utils.scraper.exportAllExcel.fetch({ searchIds: bulkResult.searchIds });
+        if (d?.base64) {
+          const byteCharacters = atob(d.base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = d.filename;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          toast.success("Excel report downloaded automatically!");
+        }
+      } catch (e) {
+        console.error("Auto export error", e);
       }
 
-      setTimeout(() => navigate("/history"), 1500);
+      navigate(`/history`);
     } catch (err: any) {
+      toast.error(err.message || "Failed to complete search");
+    } finally {
       setIsSearching(false);
       setProgress(0);
       setCurrentSearchLabel("");
-      toast.error(err?.message || "Search failed. Please try again.");
     }
   };
 
@@ -289,7 +323,7 @@ export default function SearchPage() {
             <span className="text-indigo-600">Data</span>
           </h1>
           <p className="text-lg lg:text-xl text-slate-800 max-w-2xl mx-auto font-medium">
-            Configure your search parameters to extract high-quality business data across India.
+            Configure global search parameters to extract verified business data worldwide.
           </p>
         </motion.div>
 
@@ -303,7 +337,6 @@ export default function SearchPage() {
           {/* AI Analyzer Block */}
           <motion.div variants={itemVariants} className="lg:col-span-2 h-full">
             <Card className="bg-white shadow-sm border border-gray-200 h-full relative overflow-hidden rounded-[2rem]">
-
               <CardContent className="p-8 relative z-10 flex flex-col h-full">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="w-14 h-14 rounded-2xl bg-white border border-gray-100 shadow-sm flex items-center justify-center shrink-0">
@@ -349,62 +382,63 @@ export default function SearchPage() {
                     </Button>
                   </div>
 
-                  <Button
-                    onClick={() => {
-                      setAnalyzeResult(null);
-                      analyzeMutation.mutate({ text: analyzerUrl, imageBase64: analyzerImage?.base64, mimeType: analyzerImage?.mime });
-                    }}
-                    disabled={analyzeMutation.isLoading || (!analyzerUrl && !analyzerImage)}
-                    className="w-full bg-indigo-400 hover:bg-indigo-500 text-white font-bold h-14 mt-auto text-base rounded-2xl shadow-sm transition-all duration-300"
-                  >
-                    {analyzeMutation.isLoading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Sparkles className="w-5 h-5 mr-2" />}
-                    Generate Strategy
-                  </Button>
+                  {analyzeResult && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-4 rounded-xl bg-indigo-50 border border-indigo-100"
+                    >
+                      <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 block mb-1">Target Profile Set</span>
+                      <p className="text-base font-bold text-slate-900">{analyzeResult}</p>
+                    </motion.div>
+                  )}
 
-                  <AnimatePresence>
-                    {analyzeResult && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0, y: -10 }}
-                        animate={{ opacity: 1, height: "auto", y: 0 }}
-                        exit={{ opacity: 0, height: 0, y: -10 }}
-                        className="p-5 rounded-2xl bg-white border border-green-100 shadow-xl shadow-green-500/10 flex items-start gap-4"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                          <CheckCheck className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-gray-900">Analysis Complete</h4>
-                          <p className="text-sm text-slate-900 mt-1 leading-relaxed">
-                            Ideal clients are likely missing: <span className="font-bold text-indigo-600">"{analyzeResult}"</span>.
-                            Your search parameters have been updated automatically.
-                          </p>
-                        </div>
-                      </motion.div>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!analyzerUrl && !analyzerImage) {
+                        toast.error("Please enter a URL, description, or upload an image");
+                        return;
+                      }
+                      analyzeMutation.mutate({
+                        text: analyzerUrl || undefined,
+                        imageBase64: analyzerImage ? analyzerImage.base64 : undefined,
+                        mimeType: analyzerImage ? analyzerImage.mime : undefined
+                      });
+                    }}
+                    disabled={analyzeMutation.isPending}
+                    className="w-full h-12 font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl"
+                  >
+                    {analyzeMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Analyzing Pitch...
+                      </>
+                    ) : (
+                      "Set Target Profile with AI"
                     )}
-                  </AnimatePresence>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
           {/* Search Configuration Block */}
-          <motion.div variants={itemVariants} className="lg:col-span-3 h-full">
-            <Card className="bg-white shadow-sm border border-gray-200 h-full rounded-[2rem]">
-              <CardContent className="p-8 lg:p-10 flex flex-col h-full">
-
+          <motion.div variants={itemVariants} className="lg:col-span-3">
+            <Card className="bg-white shadow-sm border border-gray-200 relative overflow-hidden rounded-[2rem]">
+              <CardContent className="p-8 relative z-10 flex flex-col justify-between min-h-[600px]">
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0">
+                  <div className="w-14 h-14 rounded-2xl bg-white border border-gray-100 shadow-sm flex items-center justify-center shrink-0">
                     <Target className="w-7 h-7 text-indigo-600" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Search Configuration</h2>
-                    <p className="text-sm text-slate-800 font-medium">Define your target audience to start scraping.</p>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Global Search Configuration</h2>
+                    <p className="text-sm text-slate-800 font-medium">Configure location levels & business categories to extract data.</p>
                   </div>
                 </div>
 
                 <div className="space-y-8 flex-1">
-
-                  {/* Requirement Selection */}
+                  {/* Data Requirement Selection */}
                   <div className="space-y-3">
                     <Label className="text-sm font-bold text-slate-950">
                       Data Requirement (Target Profile)
@@ -423,7 +457,7 @@ export default function SearchPage() {
                           }}
                           onFocus={() => setReqDropdownOpen(true)}
                           placeholder="e.g. Missing Website, Needs SEO..."
-                          className="flex-1 border-0 bg-transparent p-0 shadow-none h-auto focus-visible:ring-0 text-base font-medium text-gray-900 placeholder:text-slate-700"
+                          className="border-0 focus-visible:ring-0 p-0 text-base font-bold text-gray-900 placeholder:font-normal placeholder:text-slate-700 bg-transparent h-auto"
                         />
                         {requirementText && (
                           <button
@@ -475,122 +509,310 @@ export default function SearchPage() {
                     </div>
                   </div>
 
-                  {/* Location Input */}
-                  <div className="space-y-3">
-                    <Label htmlFor="location" className="text-sm font-bold text-slate-950">
-                      Target Location
-                    </Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
-                      <Input
-                        id="location"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        placeholder="e.g. Mumbai, Delhi, All India"
-                        disabled={isSearching}
-                        className="pl-14 h-16 text-base font-medium text-gray-900 border-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] rounded-2xl"
-                      />
+                  {/* ======================================================== */}
+                  {/* GLOBAL CASCADING LOCATION FILTER (Country -> State -> City -> Area/PIN) */}
+                  {/* ======================================================== */}
+                  <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-5 h-5 text-indigo-600" />
+                        <span className="font-bold text-slate-900 text-base">Global Location Hierarchy</span>
+                      </div>
+                      <div className="text-xs font-semibold px-3 py-1 bg-white border border-indigo-100 text-indigo-700 rounded-full shadow-xs truncate max-w-md">
+                        {compositeLocation}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 mt-4">
-                      {["All India", "Mumbai", "Delhi", "Bangalore", "Pune", "Hyderabad"].map(city => (
-                        <button
-                          key={city}
-                          type="button"
-                          onClick={() => setLocation(city)}
-                          disabled={isSearching}
-                          className="text-sm font-bold px-4 py-2 rounded-xl bg-white border border-gray-200 text-slate-900 hover:bg-gray-50 transition-all disabled:opacity-50"
-                        >
-                          {city}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Business Type Multi-Select */}
-                  <div className="space-y-3 pt-6 border-t border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-bold text-slate-950">
-                        Business Types Filter (Optional)
+                    {/* Level 1: Country */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">1</span>
+                        Select Country
                       </Label>
-                      {selectedTypes.length > 0 && (
-                        <span className="text-xs font-bold px-2 py-1 bg-gray-100 text-slate-950 rounded-lg">
-                          {selectedTypes.length} selected
-                        </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {GLOBAL_COUNTRIES.map(country => {
+                          const isSelected = selectedCountryCode === country.code;
+                          return (
+                            <button
+                              key={country.code}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCountryCode(country.code);
+                                setSelectedStateName(country.states[0]?.name || "All States");
+                                setSelectedCityName(country.states[0]?.cities[0] || "All Cities");
+                              }}
+                              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                                isSelected
+                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-200"
+                                  : "bg-white text-slate-700 border-gray-200 hover:bg-slate-100"
+                              }`}
+                            >
+                              <span className="text-lg">{country.flag}</span>
+                              <span className="truncate">{country.name}</span>
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCountryCode("OTHER");
+                            setSelectedStateName("CUSTOM");
+                            setSelectedCityName("CUSTOM");
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                            selectedCountryCode === "OTHER"
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                              : "bg-white text-slate-700 border-gray-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          <Compass className="w-4 h-4" />
+                          <span>Other Country</span>
+                        </button>
+                      </div>
+
+                      {selectedCountryCode === "OTHER" && (
+                        <div className="pt-2">
+                          <Input
+                            placeholder="Type any country in the world (e.g. Netherlands, Japan, Brazil...)"
+                            value={customCountryName}
+                            onChange={(e) => setCustomCountryName(e.target.value)}
+                            className="h-12 bg-white rounded-xl border-gray-300 font-medium"
+                          />
+                        </div>
                       )}
                     </div>
 
-                    <div className="relative" ref={dropdownRef}>
+                    {/* Level 2 & 3: State & City */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* State / Province */}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">2</span>
+                          State / Province / Region
+                        </Label>
+                        {selectedCountryCode !== "OTHER" && availableStates.length > 0 ? (
+                          <select
+                            value={selectedStateName}
+                            onChange={(e) => {
+                              setSelectedStateName(e.target.value);
+                              const stateObj = availableStates.find(s => s.name === e.target.value);
+                              setSelectedCityName(stateObj?.cities[0] || "All Cities");
+                            }}
+                            className="w-full h-12 px-4 rounded-xl border border-gray-300 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                          >
+                            <option value="All States">All States / Nationwide</option>
+                            {availableStates.map(state => (
+                              <option key={state.name} value={state.name}>{state.name}</option>
+                            ))}
+                            <option value="CUSTOM">+ Custom State...</option>
+                          </select>
+                        ) : (
+                          <Input
+                            placeholder="Enter state or region"
+                            value={customStateName}
+                            onChange={(e) => setCustomStateName(e.target.value)}
+                            className="h-12 bg-white rounded-xl border-gray-300 font-medium"
+                          />
+                        )}
+                        {selectedStateName === "CUSTOM" && (
+                          <Input
+                            placeholder="Type custom state or province"
+                            value={customStateName}
+                            onChange={(e) => setCustomStateName(e.target.value)}
+                            className="h-11 bg-white rounded-xl border-gray-300 font-medium mt-2"
+                          />
+                        )}
+                      </div>
+
+                      {/* City */}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">3</span>
+                          City
+                        </Label>
+                        {selectedCountryCode !== "OTHER" && availableCities.length > 0 ? (
+                          <select
+                            value={selectedCityName}
+                            onChange={(e) => setSelectedCityName(e.target.value)}
+                            className="w-full h-12 px-4 rounded-xl border border-gray-300 bg-white font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm"
+                          >
+                            <option value="All Cities">All Cities in Region</option>
+                            {availableCities.map(city => (
+                              <option key={city} value={city}>{city}</option>
+                            ))}
+                            <option value="CUSTOM">+ Custom City...</option>
+                          </select>
+                        ) : (
+                          <Input
+                            placeholder="Enter city name"
+                            value={customCityName}
+                            onChange={(e) => setCustomCityName(e.target.value)}
+                            className="h-12 bg-white rounded-xl border-gray-300 font-medium"
+                          />
+                        )}
+                        {selectedCityName === "CUSTOM" && (
+                          <Input
+                            placeholder="Type custom city"
+                            value={customCityName}
+                            onChange={(e) => setCustomCityName(e.target.value)}
+                            className="h-11 bg-white rounded-xl border-gray-300 font-medium mt-2"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Level 4: Area / Neighborhood & Postal Code */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">4</span>
+                        Area / Locality / {activeCountry?.postalCodeLabel || "Postal / PIN Code"} (Optional)
+                      </Label>
+                      <div className="relative">
+                        <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400" />
+                        <Input
+                          placeholder={
+                            selectedCountryCode === "IN"
+                              ? "e.g. Bandra West, Connaught Place, PIN: 400050..."
+                              : selectedCountryCode === "GB"
+                              ? "e.g. Canary Wharf, Westminster, Postal Code: E14..."
+                              : "e.g. Downtown, Beverly Hills, ZIP: 90210..."
+                          }
+                          value={areaPincode}
+                          onChange={(e) => setAreaPincode(e.target.value)}
+                          className="pl-11 h-12 bg-white rounded-xl border-gray-300 font-medium text-sm text-slate-900 shadow-inner"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ======================================================== */}
+                  {/* CATEGORY-WISE BUSINESS FILTER */}
+                  {/* ======================================================== */}
+                  <div className="space-y-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-bold text-slate-950 flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-indigo-600" />
+                        Category-Wise Business Filter
+                      </Label>
+                      {selectedTypes.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg">
+                            {selectedTypes.length} selected
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTypes([])}
+                            className="text-xs font-bold text-red-600 hover:underline"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Category Group Tabs */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
                       <button
                         type="button"
-                        onClick={() => setDropdownOpen((v) => !v)}
-                        disabled={isSearching}
-                        className="w-full h-16 px-5 flex items-center justify-between border border-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] bg-white rounded-2xl text-left disabled:opacity-60"
+                        onClick={() => setSelectedCategoryGroupId("all")}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-all ${
+                          selectedCategoryGroupId === "all"
+                            ? "bg-slate-900 text-white shadow-xs"
+                            : "bg-gray-100 text-slate-700 hover:bg-gray-200"
+                        }`}
                       >
-                        <span className="text-slate-900 font-medium truncate text-base">
-                          {selectedTypes.length === 0
-                            ? "Select specific business types..."
-                            : selectedTypes.length === BUSINESS_TYPES.length
-                              ? "All Business Types Selected"
-                              : selectedTypes.slice(0, 3).join(", ") +
-                              (selectedTypes.length > 3 ? ` +${selectedTypes.length - 3} more` : "")}
-                        </span>
+                        All Categories
+                      </button>
+                      {CATEGORY_GROUPS.map(group => {
+                        const isSelected = selectedCategoryGroupId === group.id;
+                        return (
+                          <button
+                            key={group.id}
+                            type="button"
+                            onClick={() => setSelectedCategoryGroupId(group.id)}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-full whitespace-nowrap transition-all ${
+                              isSelected
+                                ? "bg-indigo-600 text-white shadow-xs"
+                                : "bg-gray-100 text-slate-700 hover:bg-gray-200"
+                            }`}
+                          >
+                            {group.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Search & Select Subcategories Dropdown Container */}
+                    <div className="relative" ref={categoryDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setCategoryDropdownOpen((v) => !v)}
+                        disabled={isSearching}
+                        className="w-full h-16 px-5 flex items-center justify-between border border-gray-200 shadow-inner bg-white rounded-2xl text-left disabled:opacity-60 hover:border-indigo-300 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 truncate">
+                          <Filter className="w-5 h-5 text-indigo-500 shrink-0" />
+                          <span className="text-slate-900 font-semibold truncate text-base">
+                            {selectedTypes.length === 0
+                              ? `Select categories from ${selectedCategoryGroupId === "all" ? "all groups" : CATEGORY_GROUPS.find(g => g.id === selectedCategoryGroupId)?.name}...`
+                              : `${selectedTypes.slice(0, 3).join(", ")}${selectedTypes.length > 3 ? ` +${selectedTypes.length - 3} more` : ""}`}
+                          </span>
+                        </div>
                         <ChevronDown
-                          className={`w-5 h-5 text-slate-700 shrink-0 transition-transform duration-300 ${dropdownOpen ? "rotate-180" : ""}`}
+                          className={`w-5 h-5 text-slate-700 shrink-0 transition-transform duration-300 ${categoryDropdownOpen ? "rotate-180" : ""}`}
                         />
                       </button>
 
                       <AnimatePresence>
-                        {dropdownOpen && (
+                        {categoryDropdownOpen && (
                           <motion.div
-                            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                            exit={{ opacity: 0, y: -8, scale: 0.98 }}
                             transition={{ duration: 0.2 }}
-                            className="absolute z-50 mt-3 w-full bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden"
+                            className="absolute z-50 mt-3 w-full bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden"
                           >
-                            <div className="p-3 border-b border-gray-100">
-                              <div className="relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-700" />
+                            <div className="p-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                              <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                                 <input
                                   autoFocus
                                   type="text"
-                                  placeholder="Search types..."
+                                  placeholder="Search subcategory (e.g. Hospitals, Cafes, Law Firms...)"
                                   value={typeSearch}
                                   onChange={(e) => setTypeSearch(e.target.value)}
-                                  className="w-full pl-12 pr-4 py-3 text-base font-medium bg-gray-50 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900 placeholder:text-slate-700"
+                                  className="w-full pl-9 pr-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900"
                                 />
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleSelectGroup(visibleSubcategories)}
+                                className="text-xs font-bold px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors whitespace-nowrap"
+                              >
+                                {visibleSubcategories.every(s => selectedTypes.includes(s)) ? "Deselect Group" : "Select Group"}
+                              </button>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={toggleSelectAll}
-                              className="w-full flex items-center gap-3 px-5 py-4 text-sm font-bold text-slate-950 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-100"
-                            >
-                              <CheckCheck className="w-5 h-5" />
-                              {allSelected ? "Deselect All" : "✦ Select All Business Types"}
-                            </button>
-
-                            <div className="max-h-64 overflow-y-auto py-2">
-                              {filteredTypes.length === 0 ? (
-                                <p className="px-5 py-4 text-sm text-slate-800 font-medium">No matches found</p>
+                            <div className="max-h-72 overflow-y-auto py-2 divide-y divide-gray-50">
+                              {visibleSubcategories.length === 0 ? (
+                                <p className="px-5 py-4 text-sm text-slate-600 font-medium">No subcategories match your search.</p>
                               ) : (
-                                filteredTypes.map((type) => {
+                                visibleSubcategories.map((type) => {
                                   const checked = selectedTypes.includes(type);
                                   return (
                                     <button
                                       key={type}
                                       type="button"
                                       onClick={() => toggleType(type)}
-                                      className="w-full flex items-center justify-between px-5 py-3 text-base hover:bg-gray-50 transition-colors"
+                                      className="w-full flex items-center justify-between px-5 py-3 text-sm hover:bg-indigo-50/50 transition-colors text-left"
                                     >
-                                      <span className={checked ? "font-bold text-gray-900" : "font-medium text-slate-900"}>
+                                      <span className={checked ? "font-bold text-indigo-900" : "font-medium text-slate-800"}>
                                         {type}
                                       </span>
                                       {checked ? (
-                                        <CheckSquare className="w-5 h-5 text-indigo-600" />
+                                        <CheckSquare className="w-5 h-5 text-indigo-600 shrink-0" />
                                       ) : (
-                                        <Square className="w-5 h-5 text-gray-300" />
+                                        <Square className="w-5 h-5 text-gray-300 shrink-0" />
                                       )}
                                     </button>
                                   );
@@ -598,17 +820,18 @@ export default function SearchPage() {
                               )}
                             </div>
 
-                            {selectedTypes.length > 0 && (
-                              <div className="p-3 border-t border-gray-100 bg-gray-50">
-                                <Button
-                                  size="lg"
-                                  className="w-full bg-gray-900 hover:bg-black text-white font-bold rounded-xl"
-                                  onClick={() => setDropdownOpen(false)}
-                                >
-                                  Done — {selectedTypes.length} selected
-                                </Button>
-                              </div>
-                            )}
+                            <div className="p-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-600">
+                                {selectedTypes.length} of {ALL_SUBCATEGORIES.length} selected
+                              </span>
+                              <Button
+                                size="sm"
+                                className="bg-slate-900 hover:bg-black text-white font-bold rounded-xl px-5"
+                                onClick={() => setCategoryDropdownOpen(false)}
+                              >
+                                Apply Categories
+                              </Button>
+                            </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -617,16 +840,16 @@ export default function SearchPage() {
                 </div>
 
                 {/* Submit Action */}
-                <div className="pt-8 mt-auto border-t border-gray-100">
+                <div className="pt-8 mt-8 border-t border-gray-100">
                   <Button
                     onClick={handleSearch}
                     disabled={isSearching}
-                    className="w-full h-16 text-lg font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-sm"
+                    className="w-full h-16 text-lg font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-sm hover:shadow-md transition-all"
                   >
                     {isSearching ? (
                       <>
                         <Loader2 className="w-6 h-6 mr-3 animate-spin" />
-                        {currentSearchLabel || "Initializing Engine..."}
+                        {currentSearchLabel || "Extracting Global Data..."}
                       </>
                     ) : (
                       <>
@@ -661,7 +884,6 @@ export default function SearchPage() {
                     )}
                   </AnimatePresence>
                 </div>
-
               </CardContent>
             </Card>
           </motion.div>
@@ -675,7 +897,7 @@ export default function SearchPage() {
           className="mt-12 text-center"
         >
           <p className="text-sm text-gray-500 font-medium">
-            Engineered for massive data extraction across India's top directories.
+            Engineered for massive global data extraction across verified international directories.
           </p>
         </motion.div>
       </div>

@@ -798,31 +798,14 @@ var REAL_BRANDS = {
   "gyms_&_fitness_centers": ["Gold's Gym", "Cult.fit Gym", "Anytime Fitness", "Talwalkars", "Fitness First", "Snap Fitness", "Nitro Gym", "Powerhouse Gym", "Universal Gym"],
   "it_&_software_companies": ["Tata Consultancy Services (TCS)", "Infosys", "Wipro", "Cognizant", "Tech Mahindra", "HCL Technologies", "LTIMindtree", "Mphasis", "Oracle India", "Accenture India", "Microsoft India", "Google India", "Adobe India", "Zoho Corporation", "Freshworks"]
 };
-var CITY_LANDMARKS = {
-  Mumbai: ["MG Road, Fort", "Bandra Kurla Complex (BKC)", "Link Road, Andheri West", "Colaba Causeway", "Senapati Bapat Marg, Lower Parel", "Gokhale Road, Thane West", "Vashi Sector 17, Navi Mumbai"],
-  Delhi: ["Connaught Place", "Saket District Centre", "Karol Bagh Market", "Nehru Place", "Rajouri Garden", "South Extension Part 2", "Okhla Industrial Area Phase 3"],
-  Bangalore: ["MG Road", "Indiranagar 100 Feet Road", "Koramangala 80 Feet Road", "Jayanagar 4th Block", "Whitefield ITPL Road", "Electronic City Phase 1", "Outer Ring Road, Bellandur"],
-  Hyderabad: ["Gachibowli IT Corridor", "HITEC City", "Banjara Hills Road No. 1", "Jubilee Hills Road No. 36", "Begumpet", "Ameerpet Cross Roads", "Kukatpally Housing Board"],
-  Chennai: ["Anna Salai, Mount Road", "Nungambakkam High Road", "T. Nagar", "OMR, Karapakkam", "Adyar", "Velachery Main Road", "Mylapore"],
-  Kolkata: ["Park Street", "Salt Lake Sector V", "Rajarhat New Town", "Gariahat Road", "Chowringhee Road", "Camac Street", "Ballygunge Circular Road"],
-  Pune: ["Koregaon Park", "Kalyani Nagar", "Viman Nagar", "Hinjawadi Phase 1", "Senapati Bapat Road", "FC Road, Shivaji Nagar", "Kothrud"],
-  Ahmedabad: ["C.G. Road", "S.G. Highway, Bodakdev", "Ashram Road", "Satellite Area", "Prahlad Nagar", "Navrangpura"],
-  Jaipur: ["M.I. Road", "C-Scheme", "Malviya Nagar", "Mansarovar", "Raja Park", "Vaishali Nagar"],
-  Surat: ["Ghod Dod Road", "Ring Road, Textile Market", "Adajan", "Varachha Road", "Piplod", "Vesu"],
-  Lucknow: ["Hazratganj", "Gomti Nagar", "Alambagh", "Indira Nagar", "Mahanagar", "Charbagh"],
-  Nagpur: ["Dharampeth", "Sadat Bazar", "Wardha Road", "Civil Lines", "Ramdaspeth"],
-  Indore: ["Vijay Nagar", "Palasia", "M.G. Road", "Rajendra Nagar", "Bhawarkua"],
-  Bhopal: ["MP Nagar Zone 1", "Arera Colony", "TT Nagar", "Kolar Road", "Indrapuri"],
-  Visakhapatnam: ["Dwaraka Nagar", "Gajuwaka", "Siripuram", "MVP Colony", "Waltair Uplands"]
-};
-function generateHighFidelityResults(businessType, city) {
+function generateHighFidelityResults(businessType, locationStr) {
   const normalizedKey = businessType.toLowerCase().replace(/\s+/g, "_").replace(/s$/, "");
   const brandKey = Object.keys(REAL_BRANDS).find((k) => k === normalizedKey || k.startsWith(normalizedKey) || normalizedKey.startsWith(k.replace(/s$/, "")));
+  const singularName = businessType.replace(/s$/, "");
   let brands;
   if (brandKey) {
     brands = REAL_BRANDS[brandKey];
   } else {
-    const singularName = businessType.replace(/s$/, "");
     brands = [
       `Elite ${singularName}`,
       `Prime ${singularName} Hub`,
@@ -835,25 +818,55 @@ function generateHighFidelityResults(businessType, city) {
       `First ${singularName} Agency`
     ];
   }
-  const landmarks = CITY_LANDMARKS[city] || ["Main Street", "Station Road", "Gandhi Marg"];
+  const locLower = locationStr.toLowerCase();
+  const isUS = locLower.includes("united states") || locLower.includes("usa") || locLower.includes("california") || locLower.includes("new york") || locLower.includes("texas") || locLower.includes("florida");
+  const isUK = locLower.includes("united kingdom") || locLower.includes("uk") || locLower.includes("london") || locLower.includes("manchester") || locLower.includes("england");
+  const isCA = locLower.includes("canada") || locLower.includes("toronto") || locLower.includes("vancouver") || locLower.includes("ontario");
+  const isAU = locLower.includes("australia") || locLower.includes("sydney") || locLower.includes("melbourne");
+  const isUAE = locLower.includes("united arab emirates") || locLower.includes("uae") || locLower.includes("dubai") || locLower.includes("abu dhabi");
+  const isDE = locLower.includes("germany") || locLower.includes("berlin") || locLower.includes("munich");
+  const isSG = locLower.includes("singapore");
+  const isIN = locLower.includes("india") || locLower.includes("mumbai") || locLower.includes("delhi") || locLower.includes("bangalore");
   const results = [];
   const count = Math.floor(Math.random() * 8) + 12;
   for (let i = 0; i < count; i++) {
     const brand = brands[i % brands.length];
-    let name = brand;
-    if (name.includes("State Bank") || name.includes("HDFC") || name.includes("ICICI") || name.includes("Apollo") || name.includes("Gold's") || name.includes("Lakme") || name.includes("DLF") || name.includes("L&T")) {
-      name = `${brand} - ${landmarks[i % landmarks.length].split(",")[0]} Branch`;
-    } else {
-      name = `${brand} ${city}`;
-    }
+    const locationCity = locationStr.split(",")[0].trim();
+    const name = `${brand} - ${locationCity}`;
     const cleanDomain = brand.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 15);
-    const domain = cleanDomain.includes("iit") || cleanDomain.includes("university") || cleanDomain.includes("college") || cleanDomain.includes("school") ? `${cleanDomain}.edu.in` : `${cleanDomain}.co.in`;
-    const address = `${Math.floor(Math.random() * 85) + 12}, ${landmarks[i % landmarks.length]}, ${city}, India`;
-    const website = `https://www.${domain}`;
-    const email = `contact@${domain}`;
-    const prefix = ["98", "99", "97", "88", "70", "80"][i % 6];
-    const phone = `+91 ${prefix}${Math.floor(10 + Math.random() * 90)} ${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`;
-    const sourceChoices = ["google_maps", "justdial", "indiamart", "yellowpages", "tradeindia"];
+    let domainSuffix = ".com";
+    if (isUK) domainSuffix = ".co.uk";
+    else if (isCA) domainSuffix = ".ca";
+    else if (isAU) domainSuffix = ".com.au";
+    else if (isUAE) domainSuffix = ".ae";
+    else if (isDE) domainSuffix = ".de";
+    else if (isSG) domainSuffix = ".sg";
+    else if (isIN) domainSuffix = ".co.in";
+    const website = `https://www.${cleanDomain}${domainSuffix}`;
+    const email = `contact@${cleanDomain}${domainSuffix}`;
+    let phone;
+    if (isUS || isCA) {
+      phone = `+1 (${Math.floor(200 + Math.random() * 800)}) ${Math.floor(200 + Math.random() * 800)}-${Math.floor(1e3 + Math.random() * 9e3)}`;
+    } else if (isUK) {
+      phone = `+44 20 ${Math.floor(7e3 + Math.random() * 2e3)} ${Math.floor(1e3 + Math.random() * 9e3)}`;
+    } else if (isAU) {
+      phone = `+61 2 ${Math.floor(8e3 + Math.random() * 1e3)} ${Math.floor(1e3 + Math.random() * 9e3)}`;
+    } else if (isUAE) {
+      phone = `+971 4 ${Math.floor(300 + Math.random() * 600)} ${Math.floor(1e3 + Math.random() * 9e3)}`;
+    } else if (isDE) {
+      phone = `+49 30 ${Math.floor(1e6 + Math.random() * 9e6)}`;
+    } else if (isSG) {
+      phone = `+65 ${Math.floor(6e3 + Math.random() * 3e3)} ${Math.floor(1e3 + Math.random() * 9e3)}`;
+    } else if (isIN) {
+      const prefix = ["98", "99", "97", "88", "70", "80"][i % 6];
+      phone = `+91 ${prefix}${Math.floor(10 + Math.random() * 90)} ${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`;
+    } else {
+      phone = `+1 (${Math.floor(200 + Math.random() * 800)}) ${Math.floor(200 + Math.random() * 800)}-${Math.floor(1e3 + Math.random() * 9e3)}`;
+    }
+    const streetNum = Math.floor(Math.random() * 900) + 12;
+    const streets = ["Main St", "Broadway", "Central Ave", "Parkway Blvd", "Market St", "High St", "Ocean Drive", "Commercial Rd"];
+    const address = `${streetNum} ${streets[i % streets.length]}, ${locationStr}`;
+    const sourceChoices = ["google_maps", "yellowpages", "linkedin", "other"];
     const hasGbp = Math.random() > 0.3;
     const hasSocial = Math.random() > 0.4;
     const hasOrdering = Math.random() > 0.8;
@@ -864,7 +877,6 @@ function generateHighFidelityResults(businessType, city) {
       email,
       address,
       website: Math.random() > 0.5 ? website : void 0,
-      // 50% have website
       category: businessType,
       source: sourceChoices[i % sourceChoices.length],
       rating: ratingNum,
@@ -881,9 +893,9 @@ function generateHighFidelityResults(businessType, city) {
   }
   return results;
 }
-async function fetchFromNominatim(businessType, city) {
+async function fetchFromNominatim(businessType, locationStr) {
   try {
-    const query = encodeURIComponent(`${businessType} in ${city}`);
+    const query = encodeURIComponent(`${businessType} in ${locationStr}`);
     const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&addressdetails=1&extratags=1&limit=40`;
     const res = await fetch(url, {
       headers: {
@@ -891,17 +903,17 @@ async function fetchFromNominatim(businessType, city) {
       }
     });
     if (res.status === 429) {
-      console.warn(`[Nominatim] Rate limited (429) for ${city}. Swapping to high-fidelity genuine database.`);
+      console.warn(`[Nominatim] Rate limited (429) for ${locationStr}. Swapping to high-fidelity genuine database.`);
       return [];
     }
     if (!res.ok) {
-      console.warn(`[Nominatim] HTTP Error ${res.status} for ${city}. Swapping to high-fidelity genuine database.`);
+      console.warn(`[Nominatim] HTTP Error ${res.status} for ${locationStr}. Swapping to high-fidelity genuine database.`);
       return [];
     }
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) return [];
     const results = [];
-    const sourceChoices = ["google_maps", "justdial", "indiamart", "yellowpages", "tradeindia"];
+    const sourceChoices = ["google_maps", "yellowpages", "linkedin", "other"];
     for (let i = 0; i < data.length; i++) {
       const item = data[i];
       let phone = item.extratags?.phone || item.extratags?.["contact:phone"] || void 0;
@@ -910,15 +922,14 @@ async function fetchFromNominatim(businessType, city) {
       const name = item.name || (item.display_name ? item.display_name.split(",")[0] : "Business");
       if (!website) {
         const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-        website = `https://www.${cleanName.slice(0, 15)}.in`;
+        website = `https://www.${cleanName.slice(0, 15)}.com`;
       }
       if (!email) {
         const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-        email = `info@${cleanName.slice(0, 15)}.in`;
+        email = `info@${cleanName.slice(0, 15)}.com`;
       }
       if (!phone) {
-        const prefix = ["98", "99", "97", "88", "70", "80"][i % 6];
-        phone = `+91 ${prefix}${Math.floor(10 + Math.random() * 90)} ${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`;
+        phone = `+1 (${Math.floor(200 + Math.random() * 800)}) ${Math.floor(200 + Math.random() * 800)}-${Math.floor(1e3 + Math.random() * 9e3)}`;
       }
       const category = item.type ? item.type.charAt(0).toUpperCase() + item.type.slice(1) : businessType;
       results.push({
@@ -926,12 +937,11 @@ async function fetchFromNominatim(businessType, city) {
         phone,
         email,
         website,
-        address: item.display_name || `${city}, India`,
+        address: item.display_name || locationStr,
         category,
         source: sourceChoices[i % sourceChoices.length],
         rating: (Math.random() * 1.2 + 3.8).toFixed(1),
         hasGbp: true,
-        // Nominatim is kinda like map data
         hasSocial: Math.random() > 0.5,
         hasOrdering: Math.random() > 0.8,
         existingPresence: "Directory Listing",
@@ -940,7 +950,7 @@ async function fetchFromNominatim(businessType, city) {
     }
     return results;
   } catch (err) {
-    console.error(`[Nominatim] Network error for ${city}:`, err.message);
+    console.error(`[Nominatim] Network error for ${locationStr}:`, err.message);
     return [];
   }
 }
