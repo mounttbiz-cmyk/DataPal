@@ -221,17 +221,14 @@ export default function SearchPage() {
       return;
     }
 
-    if (!requirementText.trim()) {
-      toast.error("Please specify a data requirement");
-      return;
-    }
-
     const matchedReq = REQUIREMENTS.find(
       (r) => r.label.toLowerCase() === requirementText.trim().toLowerCase()
     );
-    const finalRequirement = matchedReq ? matchedReq.id : requirementText.trim();
+    const finalRequirement = matchedReq ? matchedReq.id : (requirementText.trim() || "all");
 
-    const typesToSearch = selectedTypes.length === 0 ? visibleSubcategories.slice(0, 5) : [...selectedTypes];
+    const typesToSearch = selectedTypes.length > 0 
+      ? [...selectedTypes] 
+      : (visibleSubcategories.length > 0 ? visibleSubcategories.slice(0, 5) : ["Businesses"]);
 
     stopProgressInterval();
     setIsSearching(true);
