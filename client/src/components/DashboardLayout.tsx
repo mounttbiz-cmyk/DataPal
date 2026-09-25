@@ -51,8 +51,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <a href="/" className="flex items-center gap-3 cursor-pointer transition-transform hover:scale-105">
 
                 <span className="font-extrabold text-lg hidden sm:inline-block tracking-tight">
-                  <span className="text-slate-900">Leads </span>
-                  <span className="text-indigo-600">Scraper</span>
+                  <span className="text-slate-900">Data</span>
+                  <span className="text-indigo-600">Pal</span>
                 </span>
               </a>
 
@@ -174,7 +174,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center shadow-[0_8px_16px_-6px_rgba(0,0,0,0.3)]">
                   <Search className="w-5 h-5 text-white stroke-[1.5]" />
                 </div>
-                <span className="font-bold text-slate-900 text-xl tracking-tight">Leads Scraper</span>
+                <span className="font-bold text-slate-900 text-xl tracking-tight">DataPal</span>
               </a>
               <p className="text-slate-500 font-light leading-relaxed mb-8 max-w-sm">
                 The ultimate AI-powered business directory. Harvest real business data from premium sources simultaneously with pin-point accuracy.
@@ -225,7 +225,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           
           <div className="pt-8 border-t border-gray-200/50 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-slate-400 font-light">
-              &copy; {new Date().getFullYear()} Leads Scraper Inc. All rights reserved.
+              &copy; {new Date().getFullYear()} DataPal Inc. All rights reserved.
             </p>
             <div className="flex items-center gap-6 text-sm text-slate-400 font-light">
               <a href="#" className="hover:text-slate-900 transition-colors">Privacy Policy</a>

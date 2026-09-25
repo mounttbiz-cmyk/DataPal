@@ -314,7 +314,7 @@ export const appRouter = router({
 
         return {
           base64,
-          filename: `bizscraper_${search.businessType.replace(/\s+/g, "_")}_${search.location.replace(/\s+/g, "_")}.xlsx`,
+          filename: `datapal_${search.businessType.replace(/\s+/g, "_")}_${search.location.replace(/\s+/g, "_")}.xlsx`,
           phoneCount: results.filter(r => r.phone).length,
           emailCount: results.filter(r => r.email).length,
         };
@@ -357,7 +357,7 @@ export const appRouter = router({
 
         return {
           base64,
-          filename: `bizscraper_${search.businessType.replace(/\s+/g, "_")}_${search.location.replace(/\s+/g, "_")}.csv`,
+          filename: `datapal_${search.businessType.replace(/\s+/g, "_")}_${search.location.replace(/\s+/g, "_")}.csv`,
         };
       }),
 
@@ -407,7 +407,7 @@ export const appRouter = router({
 
         return {
           base64,
-          filename: `salespal_all_leads_${date}.xlsx`,
+          filename: `datapal_all_leads_${date}.xlsx`,
           totalSearches: searches.length,
           businessTypes: [...new Set(searches.map(s => s.businessType))],
         };

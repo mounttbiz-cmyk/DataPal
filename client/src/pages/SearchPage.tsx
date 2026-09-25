@@ -264,7 +264,7 @@ export default function SearchPage() {
           <CardContent className="p-8 text-center">
             <Building2 className="w-16 h-16 text-indigo-200 mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">Sign In Required</h2>
-            <p className="text-slate-800 mb-8 font-medium">Please sign in to access the business scraper</p>
+            <p className="text-slate-800 mb-8 font-medium">Please sign in to access DataPal</p>
             <Button asChild className="w-full h-12 text-base bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
               <a href="/">Go to Home</a>
             </Button>
@@ -284,10 +284,6 @@ export default function SearchPage() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="text-center mb-12"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 bg-white mb-6 shadow-sm">
-            <Sparkles className="w-4 h-4 text-indigo-600" />
-            <span className="text-sm font-bold text-gray-800 tracking-wide">Multi-Source Business Finder</span>
-          </div>
           <h1 className="text-5xl lg:text-6xl font-extrabold mb-4 tracking-tighter">
             <span className="text-slate-900">Generate </span>
             <span className="text-indigo-600">Leads</span>
