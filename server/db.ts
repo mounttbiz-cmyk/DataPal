@@ -4,13 +4,17 @@ import { createClient } from "@libsql/client";
 import { InsertUser, users, businessResults, searchHistory } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
+// Default cloud Turso database credentials (used if process.env.DATABASE_URL is not set on Vercel)
+const DEFAULT_TURSO_URL = "libsql://salesleads-aayan.aws-ap-south-1.turso.io";
+const DEFAULT_TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODU5MjM2NDIsImlkIjoiMDE5ZmQxNGUtNDcwMS03MDlkLTllM2UtNGFiMTZkNWE5OGY4Iiwia2lkIjoiMWVqLUxmY08ycXliVXdvVUM2ak5saTB2UTlOaVltZGtaQjljanAzTGFnNCIsInJpZCI6IjI4YTM3MWFmLTVkY2EtNGY4My04YTYyLTM4ZTBjNzk2MTc0YyJ9.ofQPTv0YQm7d9UgvT060oAaZYTzjVdrSqV4_0yrtHfxr4Etw15-o77eg1a2fBqIYm7IKm_kj2dmlPBGal3WVCw";
+
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
   if (!_db) {
     try {
-      const url = process.env.DATABASE_URL || "file:local.db";
-      const authToken = process.env.DATABASE_AUTH_TOKEN;
+      const url = process.env.DATABASE_URL || DEFAULT_TURSO_URL;
+      const authToken = process.env.DATABASE_AUTH_TOKEN || (url === DEFAULT_TURSO_URL ? DEFAULT_TURSO_AUTH_TOKEN : undefined);
       const client = createClient({ url, authToken });
       _db = drizzle(client);
     } catch (error) {
@@ -77,64 +81,89 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
-    throw error;
   }
 }
 
 export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
+  try {
+    const db = await getDb();
+    if (!db) {
+      console.warn("[Database] Cannot get user: database not available");
+      return undefined;
+    }
+
+    const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+    return result.length > 0 ? result[0] : undefined;
+  } catch (err) {
+    console.warn("[Database] Failed to getUserByOpenId:", err);
     return undefined;
   }
-
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
 }
 
 // Search History helpers
-export async function createSearchHistory(userId: number, businessType: string, location: string, requirement?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.insert(searchHistory).values({
-    userId,
-    businessType,
-    location,
-    requirement,
-    status: "pending",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-  return result.lastInsertRowid;
+export async function createSearchHistory(userId: number, businessType: string, location: string, requirement?: string): Promise<number> {
+  try {
+    const db = await getDb();
+    if (db) {
+      const result = await db.insert(searchHistory).values({
+        userId,
+        businessType,
+        location,
+        requirement,
+        status: "pending",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      const id = Number(result.lastInsertRowid);
+      if (id && !isNaN(id)) return id;
+    }
+  } catch (err) {
+    console.warn("[Database] Failed to insert searchHistory:", err);
+  }
+  // Return fallback timestamp id so search operations NEVER fail
+  return Math.floor(Date.now() / 1000);
 }
 
 export async function updateSearchStatus(id: number, status: string, resultsCount?: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const set: Record<string, unknown> = { 
-    status,
-    updatedAt: new Date()
-  };
-  if (resultsCount !== undefined) set.resultsCount = resultsCount;
-  await db.update(searchHistory).set(set).where(eq(searchHistory.id, id));
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const set: Record<string, unknown> = { 
+      status,
+      updatedAt: new Date()
+    };
+    if (resultsCount !== undefined) set.resultsCount = resultsCount;
+    await db.update(searchHistory).set(set).where(eq(searchHistory.id, id));
+  } catch (err) {
+    console.warn("[Database] Failed to update search status:", err);
+  }
 }
 
 export async function getSearchHistory(userId: number, limit = 20, offset = 0) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return db.select().from(searchHistory)
-    .where(eq(searchHistory.userId, userId))
-    .orderBy(desc(searchHistory.createdAt))
-    .limit(limit)
-    .offset(offset);
+  try {
+    const db = await getDb();
+    if (!db) return [];
+    return await db.select().from(searchHistory)
+      .where(eq(searchHistory.userId, userId))
+      .orderBy(desc(searchHistory.createdAt))
+      .limit(limit)
+      .offset(offset);
+  } catch (err) {
+    console.warn("[Database] Failed to get search history:", err);
+    return [];
+  }
 }
 
 export async function getSearchById(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.select().from(searchHistory).where(eq(searchHistory.id, id)).limit(1);
-  return result.length > 0 ? result[0] : null;
+  try {
+    const db = await getDb();
+    if (!db) return null;
+    const result = await db.select().from(searchHistory).where(eq(searchHistory.id, id)).limit(1);
+    return result.length > 0 ? result[0] : null;
+  } catch (err) {
+    console.warn("[Database] Failed to get search by id:", err);
+    return null;
+  }
 }
 
 // Business Results helpers
@@ -153,49 +182,71 @@ type BusinessResultInput = {
 };
 
 export async function insertBusinessResults(results: BusinessResultInput[]) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  if (results.length === 0) return;
-  
-  const resultsWithDate = results.map(r => ({
-    ...r,
-    createdAt: new Date()
-  }));
-  
-  await db.insert(businessResults).values(resultsWithDate);
+  try {
+    const db = await getDb();
+    if (!db || results.length === 0) return;
+    
+    const resultsWithDate = results.map(r => ({
+      ...r,
+      createdAt: new Date()
+    }));
+    
+    await db.insert(businessResults).values(resultsWithDate);
+  } catch (err) {
+    console.warn("[Database] Failed to insert business results:", err);
+  }
 }
 
 export async function getBusinessResults(searchId: number, limit = 20, offset = 0) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return db.select().from(businessResults)
-    .where(eq(businessResults.searchId, searchId))
-    .limit(limit)
-    .offset(offset);
+  try {
+    const db = await getDb();
+    if (!db) return [];
+    return await db.select().from(businessResults)
+      .where(eq(businessResults.searchId, searchId))
+      .limit(limit)
+      .offset(offset);
+  } catch (err) {
+    console.warn("[Database] Failed to get business results:", err);
+    return [];
+  }
 }
 
 export async function countBusinessResults(searchId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db
-    .select({ count: businessResults.id })
-    .from(businessResults)
-    .where(eq(businessResults.searchId, searchId));
-  return result.length;
+  try {
+    const db = await getDb();
+    if (!db) return 0;
+    const result = await db
+      .select({ count: businessResults.id })
+      .from(businessResults)
+      .where(eq(businessResults.searchId, searchId));
+    return result.length;
+  } catch (err) {
+    console.warn("[Database] Failed to count business results:", err);
+    return 0;
+  }
 }
 
 export async function getAllBusinessResultsForExport(searchId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return db.select().from(businessResults)
-    .where(eq(businessResults.searchId, searchId));
+  try {
+    const db = await getDb();
+    if (!db) return [];
+    return await db.select().from(businessResults)
+      .where(eq(businessResults.searchId, searchId));
+  } catch (err) {
+    console.warn("[Database] Failed to get export results:", err);
+    return [];
+  }
 }
 
 export async function getAllCompletedSearchesForUser(userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return db.select().from(searchHistory)
-    .where(and(eq(searchHistory.userId, userId), eq(searchHistory.status, "completed")))
-    .orderBy(desc(searchHistory.createdAt));
+  try {
+    const db = await getDb();
+    if (!db) return [];
+    return await db.select().from(searchHistory)
+      .where(and(eq(searchHistory.userId, userId), eq(searchHistory.status, "completed")))
+      .orderBy(desc(searchHistory.createdAt));
+  } catch (err) {
+    console.warn("[Database] Failed to get completed searches:", err);
+    return [];
+  }
 }
-
