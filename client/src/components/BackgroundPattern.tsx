@@ -1,6 +1,13 @@
 import React from 'react';
+import { useLocation } from 'wouter';
 
 export default function BackgroundPattern() {
+  const [location] = useLocation();
+
+  if (location === '/') {
+    return <div className="fixed inset-0 z-[-1] pointer-events-none bg-white"></div>;
+  }
+
   return (
     <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden bg-[#FFFFFF]">
       <style>
