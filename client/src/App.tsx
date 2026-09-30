@@ -29,6 +29,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/search">{() => <ProtectedRoute component={SearchPage} />}</Route>
+        <Route path="/datapal">{() => <ProtectedRoute component={SearchPage} />}</Route>
         <Route path="/history">{() => <ProtectedRoute component={HistoryPage} />}</Route>
         <Route path="/results/:searchId">{(params) => <ProtectedRoute component={ResultsPage} params={params} />}</Route>
         <Route path="/404" component={NotFound} />
